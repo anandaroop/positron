@@ -41,6 +41,9 @@ link-artists:
 	$(BIN)/coffee scripts/get_artist_names.coffee
 	$(BIN)/coffee scripts/link_artists.coffee
 
+link-genes:
+	$(BIN)/coffee scripts/link_genes.coffee
+
 
 # Deploys to Heroku. Run with `make deploy env=staging` or `make deploy env=production`.
 deploy: assets
