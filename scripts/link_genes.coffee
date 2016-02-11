@@ -24,7 +24,6 @@ db.articles.find({ published: true }).limit(50).toArray (err, articles) ->
 # find and link unlinked genes in the lead_paragraph and text sections of an article
 processArticle = (article, callback) ->
   bar = geneProgressBar article._id
-  # console.log article.title
   insertedGenes = []
   for gene_name, gene_slug of genes
     bar.tick 1
@@ -81,7 +80,6 @@ insertLink = (htmlFragment, regex, url) ->
 
 saveArticle = (article, callback) ->
   if process.env.SAVE_ARTICLES
-    # log "SAVE", article.id
     db.articles.save article, callback
 
 exit = (err) ->
