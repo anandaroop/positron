@@ -24,7 +24,6 @@ db.articles.find({ published: true }).limit(50).toArray (err, articles) ->
 # find and link unlinked genes in the lead_paragraph and text sections of an article
 processArticle = (article, callback) ->
   bar = geneProgressBar article._id
-  # console.log article.title
   insertedGenes = []
   for gene_name, gene_slug of genes
     bar.tick 1
@@ -57,12 +56,6 @@ processArticle = (article, callback) ->
 # generate a gene page link from its slug
 geneUrl = (slug) -> "/gene/#{slug}"
 
-geneProgressBar = (name) -> 
-  new ProgressBar "[:bar] checked :current/:total Genes in Article #{name}",
-      complete: '.',
-      incomplete: ' ',
-      total: Object.keys(genes).length
-
 # true if the provided htmlFragment contains any <a>s whose inner text matches the supplied pattern
 containsLinkedText = (htmlFragment, regex) ->
   if htmlFragment
@@ -79,10 +72,17 @@ containsText = (htmlFragment, regex) ->
 insertLink = (htmlFragment, regex, url) ->
   htmlFragment.replace(regex, "<a class=\"auto-linked-gene\" href=\"#{url}\">$1</a>")
 
+# save *only* if SAVE_ARTICLES=true is passed on the command line
 saveArticle = (article, callback) ->
-  if process.env.SAVE_ARTICLES
-    # log "SAVE", article.id
+  if process.env.SAVE_ARTICLES is 'true'
     db.articles.save article, callback
+
+# friendly output
+geneProgressBar = (name) -> 
+  new ProgressBar "[:bar] checked :current/:total Genes in Article #{name}",
+      complete: '.',
+      incomplete: ' ',
+      total: Object.keys(genes).length
 
 exit = (err) ->
   console.error "ERROR", err
