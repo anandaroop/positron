@@ -3,6 +3,7 @@
 
 require('node-env-file')(require('path').resolve __dirname, '../.env')
 db = require '../api/lib/db'
+mongojs = require 'mongojs'
 async = require 'async'
 genes = require './gene_list'
 ProgressBar = require 'progress'
@@ -22,7 +23,7 @@ db.articles.find({ published: true }).limit(50).toArray (err, articles) ->
 
 # find and link unlinked genes in the lead_paragraph and text sections of an article
 processArticle = (article, callback) ->
-  bar = geneProgressBar article.id
+  bar = geneProgressBar article._id
   # console.log article.title
   insertedGenes = []
   for gene_name, gene_slug of genes
