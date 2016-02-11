@@ -1,51 +1,77 @@
 # This utility finds unlinked mentions of gene names and links them to their 
 # corresponding gene pages, at most once per article.
 
-# rm existing a's
-
 require('node-env-file')(require('path').resolve __dirname, '../.env')
 db = require '../api/lib/db'
 async = require 'async'
 genes = require './gene_list'
-
+ProgressBar = require 'progress'
+cheerio = require 'cheerio'
+_ = require 'lodash'
 
 # db events
 db.on 'connect', -> console.log('database connected')
 db.on 'error', (err) -> console.log('database error', err)
 
 # main: get the articles, and process them asynchronously
-db.articles.find({ published: true }).limit(10).toArray (err, articles) ->
-  return exit err if err
-  # console.log articles
-  async.each(articles, processArticle, (err, results) -> 
-    console.log 'Done. Results = ', results
-	)
-  process.exit()
+db.articles.find({ published: true }).limit(50).toArray (err, articles) ->
+  exit err if err
+  async.each articles, processArticle, (err) -> exit err if err
+  process.exit 0
 
-# find and link unlinked genes in the lead_paragraph
-# and text sections of an article
+# find and link unlinked genes in the lead_paragraph and text sections of an article
 processArticle = (article, callback) ->
-  console.log article.title
+  # console.log article.title
+  insertedGenes = []
   for gene_name, gene_slug of genes
-    console.log '  gene: ', gene_name
-    text = article.lead_paragraph
-    if linkGene(text, gene_name, gene_slug)
-      continue
-    for section in article.sections when section.type is 'text'
-      text = section.body
-      if linkGene(text, gene_name, gene_slug)
-        continue
+    url = geneUrl(gene_slug)
+    regex = new RegExp("\\b(#{gene_name})\\b", 'i')
 
-# given an html text, check for existence of 
-# the gene link, adding it if necessary (at most once)
-linkGene = (text, gene_name, gene_slug) ->
-  console.log '    ', text
-  return false
-  # loop over text links' inner text
-    # if gene is found
-      # return true (link exists)
-    # else scan text for gene name
-      # if found
-        # link it 
-        # return true (link exists)
-    # return false (link does not exist)
+    # check lead ¶
+    if containsLinkedText(article.lead_paragraph, regex)
+      continue # next gene
+    if containsText(article.lead_paragraph, regex)
+      article.lead_paragraph = insertLink(article.lead_paragraph, regex, url)
+      insertedGenes.push(gene_name)
+      continue # next gene
+
+    # else no match yet, so check the sections
+    for section in article.sections when section.type is 'text'
+      if containsLinkedText(section.body, regex)
+        break # next gene
+      if containsText(section.body, regex)
+        section.body = insertLink(section.body, regex, url)
+        insertedGenes.push(gene_name)
+        break # next gene
+  
+  if insertedGenes.length
+    saveArticle article
+    console.log "Inserted", insertedGenes, 'into', article.title
+
+  callback()
+
+# generate a gene page link from its slug
+geneUrl = (slug) -> "/gene/#{slug}"
+
+# true if the provided htmlFragment contains any <a>s whose inner text matches the supplied pattern
+containsLinkedText = (htmlFragment, regex) ->
+  if htmlFragment
+    $ = cheerio.load(htmlFragment)
+    linkInnerTexts = $('a').map((i, elem) -> return $(elem).text()).toArray()
+    return _.some(linkInnerTexts, (txt) -> txt.match regex)
+
+# true if the html matches the supplied pattern (trivial, but added for readability)
+containsText = (htmlFragment, regex) ->
+  htmlFragment.match regex if htmlFragment
+    
+  
+# replace the matching pattern with a link that points to the supplied url
+insertLink = (htmlFragment, regex, url) ->
+  htmlFragment.replace(regex, "<a class=\"auto-linked-gene\" href=\"#{url}\">$1</a>")
+
+saveArticle = (article) ->
+  # console.log article.lead_paragraph, article.sections 
+
+exit = (err) ->
+  console.error "ERROR", err
+  process.exit 1
